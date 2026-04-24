@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>ZebraBase — Fish Inventory</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐟</text></svg>" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+</head>
+<body>
+
+<!-- ── SETUP OVERLAY ── -->
+<div id="setup-overlay" class="overlay active">
+  <div class="overlay-card">
+    <div class="logo-mark">🐟</div>
+    <h1>ZebraBase</h1>
+    <p class="subtitle">Zebrafish Colony Manager</p>
+    <div class="setup-form">
+      <label>Google Sheets ID
+        <span class="help-tip" title="The long string in your Google Sheet URL between /d/ and /edit">?</span>
+      </label>
+      <input id="sheet-id-input" type="text" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms" />
+      <label>API Key <span class="help-tip" title="From Google Cloud Console → Credentials → API Key (enable Sheets API)">?</span></label>
+      <input id="api-key-input" type="text" placeholder="AIzaSy..." />
+      <label>Sheet Tab Name</label>
+      <input id="sheet-tab-input" type="text" placeholder="Fish" value="Fish" />
+      <button class="btn-primary" id="connect-btn" onclick="connectSheets()">Connect to Google Sheets</button>
+      <div class="divider">or</div>
+      <button class="btn-ghost" onclick="useDemoMode()">Use Demo Mode (offline)</button>
+      <p class="setup-note">📋 <a href="SETUP.md" target="_blank">Setup guide</a> — make your sheet public (Viewer) or use an API key.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ── SCAN OVERLAY ── -->
+<div id="scan-overlay" class="overlay">
+  <div class="scan-card">
+    <button class="close-btn" onclick="closeScanner()">✕</button>
+    <h2>Scan Tank Barcode</h2>
+    <div id="scanner-viewport">
+      <div id="interactive" class="viewport"></div>
+      <div class="scan-line"></div>
+      <p id="scan-status">Initializing camera…</p>
+    </div>
+    <div class="scan-manual">
+      <input id="manual-barcode" type="text" placeholder="Or type barcode / tank ID" />
+      <button class="btn-primary" onclick="manualBarcode()">Search</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ADD / EDIT MODAL ── -->
+<div id="fish-modal" class="overlay">
+  <div class="modal-card">
+    <button class="close-btn" onclick="closeModal()">✕</button>
+    <h2 id="modal-title">Add Tank</h2>
+    <form id="fish-form" onsubmit="saveFish(event)">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Tank ID / Barcode *</label>
+          <input id="f-tank-id" type="text" required placeholder="e.g. TK-042" />
+        </div>
+        <div class="form-group">
+          <label>Line Name *</label>
+          <input id="f-line" type="text" required placeholder="e.g. Tg(fli1:EGFP)" />
+        </div>
+        <div class="form-group">
+          <label>Genotype</label>
+          <input id="f-genotype" type="text" placeholder="e.g. +/+" />
+        </div>
+        <div class="form-group">
+          <label>Age (dpf / mpf)</label>
+          <input id="f-age" type="text" placeholder="e.g. 90 dpf" />
+        </div>
+        <div class="form-group">
+          <label>Count</label>
+          <input id="f-count" type="number" min="0" placeholder="# of fish" />
+        </div>
+        <div class="form-group">
+          <label>Rack / Location</label>
+          <input id="f-location" type="text" placeholder="e.g. Rack 3A, Shelf 2" />
+        </div>
+        <div class="form-group full-width">
+          <label>Markers / Transgenes</label>
+          <div id="markers-container" class="tag-input-area"></div>
+          <div class="tag-add-row">
+            <input id="marker-input" type="text" placeholder="Add marker (e.g. EGFP, mCherry…)" />
+            <button type="button" class="btn-tag-add" onclick="addMarkerTag()">+</button>
+          </div>
+        </div>
+        <div class="form-group full-width">
+          <label>Status</label>
+          <div class="status-picker">
+            <label class="status-opt active-opt"><input type="radio" name="status" value="Active" checked /> Active</label>
+            <label class="status-opt breed-opt"><input type="radio" name="status" value="Breeding" /> Breeding</label>
+            <label class="status-opt low-opt"><input type="radio" name="status" value="Low Stock" /> Low Stock</label>
+            <label class="status-opt archive-opt"><input type="radio" name="status" value="Archived" /> Archived</label>
+          </div>
+        </div>
+        <div class="form-group full-width">
+          <label>Notes</label>
+          <textarea id="f-notes" rows="2" placeholder="Any notes about this tank…"></textarea>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-ghost" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn-primary">Save Tank</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── DETAIL DRAWER ── -->
+<div id="detail-drawer" class="drawer">
+  <div class="drawer-inner">
+    <button class="close-btn" onclick="closeDrawer()">✕</button>
+    <div id="drawer-content"></div>
+  </div>
+</div>
+<div id="drawer-backdrop" class="drawer-backdrop" onclick="closeDrawer()"></div>
+
+<!-- ── MAIN APP ── -->
+<div id="app" class="app hidden">
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-left">
+      <span class="logo-icon">🐟</span>
+      <span class="logo-text">ZebraBase</span>
+    </div>
+    <div class="header-center">
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input id="search-input" type="search" placeholder="Search tanks, lines, markers…" oninput="filterFish()" />
+      </div>
+    </div>
+    <div class="header-right">
+      <button class="icon-btn" onclick="openScanner()" title="Scan barcode">📷</button>
+      <button class="icon-btn" onclick="syncSheets()" title="Sync" id="sync-btn">⟳</button>
+      <button class="btn-primary add-btn" onclick="openAddModal()">+ Add Tank</button>
+    </div>
+  </header>
+
+  <!-- Stats bar -->
+  <div class="stats-bar">
+    <div class="stat-chip" onclick="setFilter('all')">
+      <span class="stat-num" id="stat-total">0</span>
+      <span class="stat-label">Total Tanks</span>
+    </div>
+    <div class="stat-chip" onclick="setFilter('Active')">
+      <span class="stat-num active-color" id="stat-active">0</span>
+      <span class="stat-label">Active</span>
+    </div>
+    <div class="stat-chip" onclick="setFilter('Breeding')">
+      <span class="stat-num breed-color" id="stat-breed">0</span>
+      <span class="stat-label">Breeding</span>
+    </div>
+    <div class="stat-chip" onclick="setFilter('Low Stock')">
+      <span class="stat-num low-color" id="stat-low">0</span>
+      <span class="stat-label">Low Stock</span>
+    </div>
+  </div>
+
+  <!-- Filter + sort bar -->
+  <div class="filter-bar">
+    <div class="filter-chips" id="filter-chips">
+      <button class="chip active" data-filter="all" onclick="setFilter('all')">All</button>
+      <button class="chip" data-filter="Active" onclick="setFilter('Active')">Active</button>
+      <button class="chip" data-filter="Breeding" onclick="setFilter('Breeding')">Breeding</button>
+      <button class="chip" data-filter="Low Stock" onclick="setFilter('Low Stock')">Low Stock</button>
+      <button class="chip" data-filter="Archived" onclick="setFilter('Archived')">Archived</button>
+    </div>
+    <div class="sort-wrap">
+      <select id="sort-select" onchange="sortFish()" class="sort-select">
+        <option value="tank">Tank ID</option>
+        <option value="line">Line</option>
+        <option value="age">Age</option>
+        <option value="count">Count</option>
+        <option value="updated">Last Updated</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Fish grid -->
+  <main class="fish-grid" id="fish-grid">
+    <div class="empty-state" id="empty-state">
+      <div class="empty-icon">🐠</div>
+      <p>No tanks found. Add one above!</p>
+    </div>
+  </main>
+
+  <!-- FAB for mobile -->
+  <button class="fab" onclick="openAddModal()">+</button>
+
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
