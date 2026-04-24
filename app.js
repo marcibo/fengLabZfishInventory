@@ -327,8 +327,16 @@ function updateMarkerDropdown() {
 
 window.toggleMarkerDropdown = function() {
   const dropdown = document.getElementById('marker-dropdown');
-  dropdown.classList.toggle('hidden');
-  if (!dropdown.classList.contains('hidden')) updateMarkerDropdown();
+  const btn      = document.getElementById('marker-filter-btn');
+  if (!dropdown.classList.contains('hidden')) {
+    dropdown.classList.add('hidden');
+    return;
+  }
+  const rect = btn.getBoundingClientRect();
+  dropdown.style.top   = (rect.bottom + 4) + 'px';
+  dropdown.style.right = (window.innerWidth - rect.right) + 'px';
+  dropdown.classList.remove('hidden');
+  updateMarkerDropdown();
 };
 
 window.toggleMarkerFilter = function(marker, checked) {

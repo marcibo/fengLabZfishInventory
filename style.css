@@ -497,11 +497,11 @@ body {
 .marker-filter-btn:hover,
 .marker-filter-btn.active { border-color: var(--accent); color: var(--accent); }
 .marker-dropdown {
-  position: absolute; right: 0; top: calc(100% + .4rem);
+  position: fixed;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); box-shadow: var(--shadow);
   padding: .5rem; min-width: 160px; max-height: 260px;
-  overflow-y: auto; z-index: 150;
+  overflow-y: auto; z-index: 500;
 }
 .marker-check {
   display: flex; align-items: center; gap: .5rem;
