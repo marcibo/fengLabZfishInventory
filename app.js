@@ -1,60 +1,63 @@
 /* ── ZebraBase app.js ── */
 
-// ── Constants ───────────────────────────────────────────────────────────────
-const CLIENT_ID    = '100004327605-af8aqv1jshg1u1bhiude24po7oc4mdf4.apps.googleusercontent.com';
-const SHEET_ID     = '1AviXu1_KPFRx158Af05qBmA-LCw2GhxJxvfZEFUCuqY';
-const TAB_NAME     = 'Fish';
-const DRIVE_FOLDER = '1VTpNTlB-JMLPZNKzgm0IIXCRkk9Agzf7';
-const SCOPES       = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file';
+// ── Constants ────────────────────────────────────────────────────────────────
+const CLIENT_ID     = '100004327605-af8aqv1jshg1u1bhiude24po7oc4mdf4.apps.googleusercontent.com';
+const SHEET_ID      = '1AviXu1_KPFRx158Af05qBmA-LCw2GhxJxvfZEFUCuqY';
+const TAB_NAME      = 'Fish';
+const DRIVE_FOLDER  = '1VTpNTlB-JMLPZNKzgm0IIXCRkk9Agzf7';
+const SCOPES        = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file openid email';
 
-// ── State ───────────────────────────────────────────────────────────────────
-let tokenClient    = null;
-let accessToken    = null;
-let tokenExpiry    = 0;
-let tokenResolvers = [];
-let sheetGid       = 0;
+// ── State ────────────────────────────────────────────────────────────────────
+let tokenClient      = null;
+let accessToken      = null;
+let tokenExpiry      = 0;
+let tokenResolvers   = [];
+let sheetGid         = 0;
+let currentUser      = '';
 
-let fishData        = [];
-let filtered        = [];
-let activeFilter    = 'all';
-let currentMarkers  = [];
-let currentPhotoUrl = null;
-let pendingPhotoFile = null;
-let editingId       = null;
-let demoMode        = false;
-let scannerContext   = 'search'; // 'search' | 'modal'
-let activeMarkers    = new Set();
+let fishData         = [];
+let filtered         = [];
+let activeFilter     = 'all';
+let currentMarkers   = [];   // positive
+let currentNegMarkers = [];  // negative
+let currentPhotoUrl  = null;
 let originalPhotoUrl = null;
+let pendingPhotoFile = null;
+let editingId        = null;
+let demoMode         = false;
+let scannerContext   = 'search';
+let activeMarkers    = new Set();
+let sortDir          = 1;  // 1 = asc, -1 = desc
 
-// Column order in the Google Sheet (zero-indexed):
-// TankID | Line | Genotype | Age | Count | Location | Markers | Status | Notes | LastUpdated | Photo
+// Column index in the Google Sheet (zero-based):
+// A  B     C         D    E      F         G               H       I      J        K      L
+// ID Line  Genotype  Date Count  Location  PosMarkers      Status  Notes  Updated  Photo  NegMarkers
 const COL = {
-  tankId:  0, line:    1, genotype: 2,
-  age:     3, count:   4, location: 5,
-  markers: 6, status:  7, notes:    8,
-  updated: 9, photo:  10,
+  tankId:     0, line:      1, genotype:   2,
+  age:        3, count:     4, location:   5,
+  markers:    6, status:    7, notes:      8,
+  updated:    9, photo:    10, negMarkers: 11,
 };
 
 // ── Demo data ────────────────────────────────────────────────────────────────
 const DEMO = [
-  { tankId:'TK-001', line:'Tg(fli1:EGFP)',     genotype:'+/+',             age:'90 dpf',  count:12, location:'Rack 1A, Shelf 2', markers:['EGFP','fli1'],   status:'Active',    notes:'Healthy, spawning well', photoUrl:'', updated:'2025-04-20' },
-  { tankId:'TK-002', line:'Tg(gata1:DsRed)',   genotype:'+/-',             age:'60 dpf',  count:8,  location:'Rack 1A, Shelf 3', markers:['DsRed','gata1'], status:'Breeding',  notes:'Set up breeding pair',   photoUrl:'', updated:'2025-04-22' },
-  { tankId:'TK-003', line:'casper',            genotype:'roy−/−;nacre−/−', age:'120 dpf', count:3,  location:'Rack 2B, Shelf 1', markers:[],               status:'Low Stock', notes:'Need to expand',          photoUrl:'', updated:'2025-04-15' },
-  { tankId:'TK-004', line:'Tg(mpeg1:mCherry)', genotype:'+/+',             age:'30 dpf',  count:20, location:'Rack 2B, Shelf 4', markers:['mCherry','mpeg1'],status:'Active',    notes:'',                       photoUrl:'', updated:'2025-04-21' },
-  { tankId:'TK-005', line:'AB wild-type',      genotype:'WT',              age:'180 dpf', count:6,  location:'Rack 3C, Shelf 1', markers:[],               status:'Archived',  notes:'Retired breeders',        photoUrl:'', updated:'2025-03-10' },
-  { tankId:'TK-006', line:'Tg(huc:GCaMP6s)',  genotype:'+/+',             age:'45 dpf',  count:15, location:'Rack 1B, Shelf 1', markers:['GCaMP6s','huc'], status:'Active',    notes:'Imaging stock',           photoUrl:'', updated:'2025-04-23' },
+  { tankId:'TK-001', line:'Tg(fli1:EGFP)',     genotype:'+;+',  age:'2025-01-10', count:12, location:'Rack 1A, Shelf 2', markers:['EGFP','fli1'],   negMarkers:[],         status:'Active',    notes:'Healthy, spawning well', photoUrl:'', updated:'2025-04-20' },
+  { tankId:'TK-002', line:'Tg(gata1:DsRed)',   genotype:'+;-',  age:'2025-02-01', count:8,  location:'Rack 1A, Shelf 3', markers:['DsRed','gata1'], negMarkers:['fli1'],   status:'Breeding',  notes:'Set up breeding pair',   photoUrl:'', updated:'2025-04-22' },
+  { tankId:'TK-003', line:'casper',            genotype:'?;?',  age:'2024-12-05', count:3,  location:'Rack 2B, Shelf 1', markers:[],               negMarkers:[],         status:'Low Stock', notes:'Need to expand',          photoUrl:'', updated:'2025-04-15' },
+  { tankId:'TK-004', line:'Tg(mpeg1:mCherry)', genotype:'+;+',  age:'2025-03-15', count:20, location:'Rack 2B, Shelf 4', markers:['mCherry','mpeg1'],negMarkers:['DsRed'], status:'Active',    notes:'',                       photoUrl:'', updated:'2025-04-21' },
+  { tankId:'TK-005', line:'AB wild-type',      genotype:'-;-',  age:'2024-10-01', count:6,  location:'Rack 3C, Shelf 1', markers:[],               negMarkers:[],         status:'Archived',  notes:'Retired breeders',        photoUrl:'', updated:'2025-03-10' },
+  { tankId:'TK-006', line:'Tg(huc:GCaMP6s)',  genotype:'+;+',  age:'2025-03-01', count:15, location:'Rack 1B, Shelf 1', markers:['GCaMP6s','huc'], negMarkers:[],         status:'Nursery',   notes:'Imaging stock',           photoUrl:'', updated:'2025-04-23' },
 ];
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
-  if (localStorage.getItem('zebrabase-demo') === 'true') {
-    useDemoMode();
-    return;
-  }
+  if (localStorage.getItem('zebrabase-demo') === 'true') { useDemoMode(); return; }
+
   const poll = setInterval(() => {
     if (window.google?.accounts?.oauth2) {
       clearInterval(poll);
       initTokenClient();
+      if (localStorage.getItem('zb-was-signed-in') === 'true') attemptSilentAuth();
     }
   }, 100);
 });
@@ -67,10 +70,8 @@ function initTokenClient() {
       if (response.error) {
         tokenResolvers.forEach(r => r.reject(new Error(response.error)));
         tokenResolvers = [];
-        showToast('❌ Sign in failed: ' + response.error);
         const btn = document.getElementById('signin-btn');
-        btn.disabled = false;
-        btn.innerHTML = googleBtnContent();
+        if (btn) { btn.disabled = false; btn.innerHTML = googleBtnContent(); }
         return;
       }
       accessToken = response.access_token;
@@ -78,6 +79,20 @@ function initTokenClient() {
       tokenResolvers.forEach(r => r.resolve());
       tokenResolvers = [];
     },
+  });
+}
+
+function attemptSilentAuth() {
+  const btn = document.getElementById('signin-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Reconnecting…'; }
+  new Promise((resolve, reject) => {
+    tokenResolvers.push({ resolve, reject });
+    tokenClient.requestAccessToken({ prompt: '' });
+  }).then(async () => {
+    await Promise.all([fetchSheetGid(), fetchFromSheets(), fetchUserInfo()]);
+    showApp();
+  }).catch(() => {
+    if (btn) { btn.disabled = false; btn.innerHTML = googleBtnContent(); }
   });
 }
 
@@ -100,40 +115,31 @@ function ensureToken() {
 }
 
 window.signIn = async function() {
-  if (!tokenClient) {
-    showToast('⚠️ Google Auth not ready yet, please wait…');
-    return;
-  }
+  if (!tokenClient) { showToast('⚠️ Google Auth not ready yet, please wait…'); return; }
   const btn = document.getElementById('signin-btn');
-  btn.disabled = true;
-  btn.textContent = 'Signing in…';
+  btn.disabled = true; btn.textContent = 'Signing in…';
   try {
     await new Promise((resolve, reject) => {
       tokenResolvers.push({ resolve, reject });
       tokenClient.requestAccessToken({ prompt: 'select_account' });
     });
-    await Promise.all([fetchSheetGid(), fetchFromSheets(), ensureChangelogSheet()]);
+    await Promise.all([fetchSheetGid(), fetchFromSheets(), fetchUserInfo()]);
+    localStorage.setItem('zb-was-signed-in', 'true');
     showApp();
   } catch(e) {
-    btn.disabled = false;
-    btn.innerHTML = googleBtnContent();
+    btn.disabled = false; btn.innerHTML = googleBtnContent();
   }
 };
 
 window.signOut = function() {
-  if (accessToken) {
-    google.accounts.oauth2.revoke(accessToken, () => {});
-  }
-  accessToken = null;
-  tokenExpiry  = 0;
-  fishData     = [];
-  demoMode     = false;
+  if (accessToken) google.accounts.oauth2.revoke(accessToken, () => {});
+  accessToken = null; tokenExpiry = 0; fishData = []; demoMode = false; currentUser = '';
+  localStorage.removeItem('zb-was-signed-in');
   localStorage.removeItem('zebrabase-demo');
   document.getElementById('app').classList.add('hidden');
   document.getElementById('setup-overlay').classList.add('active');
   const btn = document.getElementById('signin-btn');
-  btn.disabled = false;
-  btn.innerHTML = googleBtnContent();
+  btn.disabled = false; btn.innerHTML = googleBtnContent();
 };
 
 window.useDemoMode = function() {
@@ -152,12 +158,19 @@ function showApp() {
   renderAll();
 }
 
-// ── Authenticated fetch ──────────────────────────────────────────────────────
+async function fetchUserInfo() {
+  try {
+    const res  = await authFetch('https://www.googleapis.com/oauth2/v3/userinfo');
+    const json = await res.json();
+    currentUser = json.email || json.name || '';
+  } catch(e) { currentUser = ''; }
+}
+
+// ── Authenticated fetch ───────────────────────────────────────────────────────
 async function authFetch(url, options = {}) {
   if (!accessToken || Date.now() > tokenExpiry) {
     showToast('⚠️ Session expired — please sign in again.');
-    signOut();
-    throw new Error('No valid token');
+    signOut(); throw new Error('No valid token');
   }
   return fetch(url, {
     ...options,
@@ -172,9 +185,7 @@ async function fetchSheetGid() {
     const json = await res.json();
     const sheet = (json.sheets || []).find(s => s.properties.title === TAB_NAME);
     sheetGid = sheet?.properties?.sheetId ?? 0;
-  } catch(e) {
-    console.warn('Could not fetch sheet GID:', e.message);
-  }
+  } catch(e) { console.warn('Could not fetch sheet GID:', e.message); }
 }
 
 async function fetchFromSheets() {
@@ -184,34 +195,32 @@ async function fetchFromSheets() {
     if (json.error) { showToast('❌ Sheets error: ' + json.error.message); return false; }
     const rows = json.values || [];
     fishData = rows.slice(1).map((r, i) => ({
-      id:       r[COL.tankId]  || `row-${i+2}`,
-      tankId:   r[COL.tankId]  || '',
-      line:     r[COL.line]    || '',
-      genotype: r[COL.genotype]|| '',
-      age:      r[COL.age]     || '',
-      count:    parseInt(r[COL.count]) || 0,
-      location: r[COL.location]|| '',
-      markers:  r[COL.markers] ? r[COL.markers].split(',').map(m => m.trim()).filter(Boolean) : [],
-      status:   r[COL.status]  || 'Active',
-      notes:    r[COL.notes]   || '',
-      updated:  r[COL.updated] || '',
-      photoUrl: r[COL.photo]   || '',
+      id:          r[COL.tankId]     || `row-${i+2}`,
+      tankId:      r[COL.tankId]     || '',
+      line:        r[COL.line]       || '',
+      genotype:    r[COL.genotype]   || '',
+      age:         r[COL.age]        || '',
+      count:       parseInt(r[COL.count]) || 0,
+      location:    r[COL.location]   || '',
+      markers:     r[COL.markers]    ? r[COL.markers].split(',').map(m => m.trim()).filter(Boolean) : [],
+      negMarkers:  r[COL.negMarkers] ? r[COL.negMarkers].split(',').map(m => m.trim()).filter(Boolean) : [],
+      status:      r[COL.status]     || 'Active',
+      notes:       r[COL.notes]      || '',
+      updated:     r[COL.updated]    || '',
+      photoUrl:    r[COL.photo]      || '',
       _rowIndex: i + 2,
     }));
     showToast('✅ Synced ' + fishData.length + ' tanks');
     return true;
-  } catch(e) {
-    showToast('❌ Network error: ' + e.message);
-    return false;
-  }
+  } catch(e) { showToast('❌ Network error: ' + e.message); return false; }
 }
 
 async function appendToSheets(record) {
   const res  = await authFetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(TAB_NAME)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(TAB_NAME)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ values: [recordToRow(record)] }) }
   );
-  const json = await res.json();
+  const json  = await res.json();
   const match = json.updates?.updatedRange?.match(/(\d+)$/);
   return match ? parseInt(match[1]) : null;
 }
@@ -219,7 +228,7 @@ async function appendToSheets(record) {
 async function updateSheetRow(record, rowIndex) {
   const range = `${TAB_NAME}!A${rowIndex}`;
   await authFetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`,
+    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW`,
     { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ values: [recordToRow(record)] }) }
   );
 }
@@ -228,11 +237,8 @@ async function deleteSheetRow(rowIndex) {
   await authFetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}:batchUpdate`,
     {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requests: [{ deleteDimension: { range: { sheetId: sheetGid, dimension: 'ROWS', startIndex: rowIndex - 1, endIndex: rowIndex } } }]
-      }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requests: [{ deleteDimension: { range: { sheetId: sheetGid, dimension: 'ROWS', startIndex: rowIndex - 1, endIndex: rowIndex } } }] }),
     }
   );
 }
@@ -241,10 +247,11 @@ function recordToRow(r) {
   return [
     r.tankId, r.line, r.genotype, r.age,
     r.count, r.location,
-    (r.markers || []).join(', '),
+    (r.markers    || []).join(', '),
     r.status, r.notes,
     new Date().toISOString().slice(0, 10),
-    r.photoUrl || '',
+    r.photoUrl    || '',
+    (r.negMarkers || []).join(', '),
   ];
 }
 
@@ -263,75 +270,40 @@ window.syncSheets = async function() {
 };
 
 // ── Changelog ────────────────────────────────────────────────────────────────
-const CHANGELOG_TAB = 'Changelog';
-
-async function ensureChangelogSheet() {
-  try {
-    const res  = await authFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets.properties`);
-    const json = await res.json();
-    const exists = (json.sheets || []).some(s => s.properties.title === CHANGELOG_TAB);
-    if (!exists) {
-      await authFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}:batchUpdate`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requests: [{ addSheet: { properties: { title: CHANGELOG_TAB } } }] }),
-      });
-      await authFetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${CHANGELOG_TAB}!A1?valueInputOption=USER_ENTERED`,
-        { method: 'PUT', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ values: [['Timestamp', 'Action', 'Tank ID', 'Line', 'Details']] }) }
-      );
-    }
-  } catch(e) { console.warn('Changelog setup failed:', e); }
-}
-
 function logChange(action, record, details = '') {
   if (demoMode) return;
-  const row = [
-    new Date().toISOString(), action,
-    record.tankId || '', record.line || '', details,
-  ];
+  const row = [new Date().toISOString(), action, record.tankId || '', record.line || '', currentUser || '', details];
   authFetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${CHANGELOG_TAB}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ values: [row] }) }
+    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/changelog:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ values: [row] }) }
   ).catch(e => console.warn('Changelog write failed:', e));
 }
 
-// ── Google Drive (photo upload) ──────────────────────────────────────────────
+// ── Google Drive ──────────────────────────────────────────────────────────────
 async function uploadPhoto(file) {
-  const metadata = {
-    name: `zebrabase_${Date.now()}_${file.name}`,
-    mimeType: file.type,
-    parents: [DRIVE_FOLDER],
-  };
+  const metadata = { name: `zebrabase_${Date.now()}_${file.name}`, mimeType: file.type, parents: [DRIVE_FOLDER] };
   const form = new FormData();
   form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
   form.append('file', file);
-
-  const uploadRes  = await authFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', { method: 'POST', body: form });
+  const uploadRes   = await authFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', { method: 'POST', body: form });
   const { id: fileId } = await uploadRes.json();
-
   await authFetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ role: 'reader', type: 'anyone' }),
   });
-
   return `https://drive.google.com/thumbnail?id=${fileId}&sz=w800`;
 }
 
 function extractDriveFileId(url) {
-  if (!url) return null;
-  const match = url.match(/[?&]id=([^&]+)/);
+  const match = (url || '').match(/[?&]id=([^&]+)/);
   return match ? match[1] : null;
 }
 
 async function deleteDrivePhoto(photoUrl) {
   const fileId = extractDriveFileId(photoUrl);
   if (!fileId || demoMode) return;
-  try {
-    await authFetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, { method: 'DELETE' });
-  } catch(e) { console.warn('Drive photo delete failed:', e); }
+  try { await authFetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, { method: 'DELETE' }); }
+  catch(e) { console.warn('Drive photo delete failed:', e); }
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
@@ -348,69 +320,11 @@ function formatDate(dateStr) {
   return isNaN(d) ? dateStr : d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-function allUniqueMarkers() {
-  return [...new Set(fishData.flatMap(f => f.markers || []))].sort();
-}
-
-function updateMarkerDatalist() {
-  const datalist = document.getElementById('markers-datalist');
-  if (!datalist) return;
-  datalist.innerHTML = allUniqueMarkers().map(m => `<option value="${esc(m)}">`).join('');
-}
-
-function updateMarkerDropdown() {
-  const dropdown = document.getElementById('marker-dropdown');
-  if (!dropdown || dropdown.classList.contains('hidden')) return;
-  const markers = allUniqueMarkers();
-  if (markers.length === 0) {
-    dropdown.innerHTML = '<p class="marker-dropdown-empty">No markers in inventory</p>';
-    return;
-  }
-  dropdown.innerHTML = markers.map(m => `
-    <label class="marker-check">
-      <input type="checkbox" value="${esc(m)}" ${activeMarkers.has(m) ? 'checked' : ''}
-        onchange="toggleMarkerFilter('${esc(m)}', this.checked)" />
-      ${esc(m)}
-    </label>
-  `).join('');
-}
-
-window.toggleMarkerDropdown = function() {
-  const dropdown = document.getElementById('marker-dropdown');
-  const btn      = document.getElementById('marker-filter-btn');
-  if (!dropdown.classList.contains('hidden')) {
-    dropdown.classList.add('hidden');
-    return;
-  }
-  const rect = btn.getBoundingClientRect();
-  dropdown.style.top   = (rect.bottom + 4) + 'px';
-  dropdown.style.right = (window.innerWidth - rect.right) + 'px';
-  dropdown.classList.remove('hidden');
-  updateMarkerDropdown();
-};
-
-window.toggleMarkerFilter = function(marker, checked) {
-  if (checked) activeMarkers.add(marker); else activeMarkers.delete(marker);
-  const count = activeMarkers.size;
-  const countEl = document.getElementById('marker-filter-count');
-  if (countEl) countEl.textContent = count > 0 ? ` (${count})` : '';
-  const btn = document.getElementById('marker-filter-btn');
-  if (btn) btn.classList.toggle('active', count > 0);
-  filterFish();
-};
-
-document.addEventListener('click', e => {
-  const wrap = document.getElementById('marker-filter-wrap');
-  if (wrap && !wrap.contains(e.target)) {
-    document.getElementById('marker-dropdown')?.classList.add('hidden');
-  }
-});
-
 function updateStats() {
-  document.getElementById('stat-total').textContent   = fishData.length;
-  document.getElementById('stat-active').textContent  = fishData.filter(f => f.status === 'Active').length;
-  document.getElementById('stat-breed').textContent   = fishData.filter(f => f.status === 'Breeding').length;
-  document.getElementById('stat-low').textContent     = fishData.filter(f => f.status === 'Low Stock').length;
+  document.getElementById('stat-total').textContent     = fishData.length;
+  document.getElementById('stat-active').textContent    = fishData.filter(f => f.status === 'Active').length;
+  document.getElementById('stat-breed').textContent     = fishData.filter(f => f.status === 'Breeding').length;
+  document.getElementById('stat-low').textContent       = fishData.filter(f => f.status === 'Low Stock').length;
   document.getElementById('stat-nursery').textContent   = fishData.filter(f => f.status === 'Nursery').length;
   document.getElementById('stat-incubator').textContent = fishData.filter(f => f.status === 'Incubator').length;
 }
@@ -420,17 +334,18 @@ window.filterFish = function() {
   filtered = fishData.filter(f => {
     if (activeFilter !== 'all' && f.status !== activeFilter) return false;
     if (activeMarkers.size > 0) {
-      const fishMarkerSet = new Set(f.markers || []);
-      for (const m of activeMarkers) { if (!fishMarkerSet.has(m)) return false; }
+      const all = new Set([...(f.markers || []), ...(f.negMarkers || [])]);
+      for (const m of activeMarkers) { if (!all.has(m)) return false; }
     }
     if (!q) return true;
     return (
-      f.tankId.toLowerCase().includes(q)   ||
-      f.line.toLowerCase().includes(q)     ||
-      f.genotype.toLowerCase().includes(q) ||
-      f.location.toLowerCase().includes(q) ||
-      (f.markers || []).some(m => m.toLowerCase().includes(q)) ||
-      (f.notes || '').toLowerCase().includes(q)
+      f.tankId.toLowerCase().includes(q)    ||
+      f.line.toLowerCase().includes(q)      ||
+      f.genotype.toLowerCase().includes(q)  ||
+      f.location.toLowerCase().includes(q)  ||
+      (f.markers    || []).some(m => m.toLowerCase().includes(q)) ||
+      (f.negMarkers || []).some(m => m.toLowerCase().includes(q)) ||
+      (f.notes      || '').toLowerCase().includes(q)
     );
   });
   sortFish();
@@ -439,21 +354,28 @@ window.filterFish = function() {
 window.sortFish = function() {
   const s = document.getElementById('sort-select').value;
   filtered.sort((a, b) => {
-    if (s === 'tank')    return a.tankId.localeCompare(b.tankId);
-    if (s === 'line')    return a.line.localeCompare(b.line);
-    if (s === 'age')     return (a.age || '').localeCompare(b.age || '');
-    if (s === 'count')   return (b.count || 0) - (a.count || 0);
-    if (s === 'updated') return (b.updated || '').localeCompare(a.updated || '');
-    return 0;
+    let cmp = 0;
+    if (s === 'tank')    cmp = a.tankId.localeCompare(b.tankId);
+    if (s === 'line')    cmp = a.line.localeCompare(b.line);
+    if (s === 'age')     cmp = (a.age || '').localeCompare(b.age || '');
+    if (s === 'count')   cmp = (a.count || 0) - (b.count || 0);
+    if (s === 'updated') cmp = (a.updated || '').localeCompare(b.updated || '');
+    return sortDir * cmp;
   });
   renderGrid();
+};
+
+window.toggleSortDir = function() {
+  sortDir *= -1;
+  const btn = document.getElementById('sort-dir-btn');
+  if (btn) btn.textContent = sortDir === 1 ? '↑' : '↓';
+  sortFish();
 };
 
 function renderGrid() {
   const grid  = document.getElementById('fish-grid');
   const empty = document.getElementById('empty-state');
   Array.from(grid.querySelectorAll('.fish-card')).forEach(c => c.remove());
-
   if (filtered.length === 0) { empty.style.display = 'flex'; return; }
   empty.style.display = 'none';
 
@@ -462,10 +384,9 @@ function renderGrid() {
     card.className = `fish-card status-${f.status}`;
     card.style.animationDelay = `${idx * 0.04}s`;
 
-    const markersHtml = (f.markers || []).map(m => `<span class="m-tag">${esc(m)}</span>`).join('');
-    const thumbHtml   = f.photoUrl
-      ? `<img class="card-thumb" src="${esc(f.photoUrl)}" alt="Tank photo" loading="lazy" />`
-      : '';
+    const posHtml = (f.markers    || []).map(m => `<span class="m-tag">${esc(m)}</span>`).join('');
+    const negHtml = (f.negMarkers || []).map(m => `<span class="m-tag m-tag-neg">−${esc(m)}</span>`).join('');
+    const thumbHtml = f.photoUrl ? `<img class="card-thumb" src="${esc(f.photoUrl)}" alt="Tank photo" loading="lazy" />` : '';
 
     card.innerHTML = `
       ${thumbHtml}
@@ -476,11 +397,11 @@ function renderGrid() {
       <div class="line-name">${esc(f.line)}</div>
       ${f.genotype ? `<div class="genotype">${esc(f.genotype)}</div>` : ''}
       <div class="card-meta">
-        ${f.age      ? `<span class="meta-item"><span class="meta-icon">⏱</span>${esc(f.age)}</span>` : ''}
+        ${f.age      ? `<span class="meta-item"><span class="meta-icon">📅</span>${formatDate(f.age)}</span>` : ''}
         ${f.count    ? `<span class="meta-item"><span class="meta-icon">🐟</span>${f.count}</span>` : ''}
         ${f.location ? `<span class="meta-item"><span class="meta-icon">📍</span>${esc(f.location)}</span>` : ''}
       </div>
-      ${markersHtml ? `<div class="card-markers">${markersHtml}</div>` : ''}
+      ${(posHtml || negHtml) ? `<div class="card-markers">${posHtml}${negHtml}</div>` : ''}
       <div class="card-actions">
         <button class="card-btn" onclick="event.stopPropagation(); openEditModal('${esc(f.id)}')">Edit</button>
         <button class="card-btn danger" onclick="event.stopPropagation(); deleteFish('${esc(f.id)}')">Delete</button>
@@ -495,6 +416,57 @@ function esc(str) {
   return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ── Marker autocomplete & dropdown ────────────────────────────────────────────
+function allUniqueMarkers() {
+  return [...new Set(fishData.flatMap(f => [...(f.markers || []), ...(f.negMarkers || [])]))].sort();
+}
+
+function updateMarkerDatalist() {
+  const dl = document.getElementById('markers-datalist');
+  if (dl) dl.innerHTML = allUniqueMarkers().map(m => `<option value="${esc(m)}">`).join('');
+  const ndl = document.getElementById('neg-markers-datalist');
+  if (ndl) ndl.innerHTML = allUniqueMarkers().map(m => `<option value="${esc(m)}">`).join('');
+}
+
+function updateMarkerDropdown() {
+  const dropdown = document.getElementById('marker-dropdown');
+  if (!dropdown || dropdown.classList.contains('hidden')) return;
+  const markers = allUniqueMarkers();
+  if (markers.length === 0) { dropdown.innerHTML = '<p class="marker-dropdown-empty">No markers in inventory</p>'; return; }
+  dropdown.innerHTML = markers.map(m => `
+    <label class="marker-check">
+      <input type="checkbox" value="${esc(m)}" ${activeMarkers.has(m) ? 'checked' : ''}
+        onchange="toggleMarkerFilter('${esc(m)}', this.checked)" />
+      ${esc(m)}
+    </label>
+  `).join('');
+}
+
+window.toggleMarkerDropdown = function() {
+  const dropdown = document.getElementById('marker-dropdown');
+  const btn      = document.getElementById('marker-filter-btn');
+  if (!dropdown.classList.contains('hidden')) { dropdown.classList.add('hidden'); return; }
+  const rect = btn.getBoundingClientRect();
+  dropdown.style.top   = (rect.bottom + 4) + 'px';
+  dropdown.style.right = (window.innerWidth - rect.right) + 'px';
+  dropdown.classList.remove('hidden');
+  updateMarkerDropdown();
+};
+
+window.toggleMarkerFilter = function(marker, checked) {
+  if (checked) activeMarkers.add(marker); else activeMarkers.delete(marker);
+  const count   = activeMarkers.size;
+  const countEl = document.getElementById('marker-filter-count');
+  if (countEl) countEl.textContent = count > 0 ? ` (${count})` : '';
+  document.getElementById('marker-filter-btn')?.classList.toggle('active', count > 0);
+  filterFish();
+};
+
+document.addEventListener('click', e => {
+  const wrap = document.getElementById('marker-filter-wrap');
+  if (wrap && !wrap.contains(e.target)) document.getElementById('marker-dropdown')?.classList.add('hidden');
+});
+
 // ── Filter chips ──────────────────────────────────────────────────────────────
 window.setFilter = function(val) {
   activeFilter = val;
@@ -502,46 +474,61 @@ window.setFilter = function(val) {
   filterFish();
 };
 
+// ── Scroll lock ───────────────────────────────────────────────────────────────
+function checkScrollLock() {
+  const modalOpen  = document.querySelector('.overlay.active') !== null;
+  const drawerOpen = document.getElementById('detail-drawer')?.classList.contains('open');
+  document.body.classList.toggle('modal-open', modalOpen || drawerOpen);
+}
+
 // ── Add / Edit Modal ──────────────────────────────────────────────────────────
 window.openAddModal = function() {
-  editingId        = null;
-  currentMarkers   = [];
-  currentPhotoUrl  = null;
-  pendingPhotoFile = null;
+  editingId         = null;
+  currentMarkers    = [];
+  currentNegMarkers = [];
+  currentPhotoUrl   = null;
+  originalPhotoUrl  = null;
+  pendingPhotoFile  = null;
   document.getElementById('modal-title').textContent = 'Add Tank';
   document.getElementById('fish-form').reset();
-  document.getElementById('markers-container').innerHTML = '';
+  document.getElementById('markers-container').innerHTML     = '';
+  document.getElementById('neg-markers-container').innerHTML = '';
   document.querySelector('input[name="status"][value="Active"]').checked = true;
   resetPhotoUI();
   document.getElementById('fish-modal').classList.add('active');
+  checkScrollLock();
 };
 
 window.openEditModal = function(id) {
   const f = fishData.find(x => x.id === id);
   if (!f) return;
-  editingId        = id;
-  currentMarkers   = [...(f.markers || [])];
-  currentPhotoUrl  = f.photoUrl || null;
-  originalPhotoUrl = f.photoUrl || null;
-  pendingPhotoFile = null;
-  document.getElementById('modal-title').textContent = 'Edit Tank';
-  document.getElementById('f-tank-id').value  = f.tankId;
-  document.getElementById('f-line').value     = f.line;
-  document.getElementById('f-genotype').value = f.genotype || '';
-  document.getElementById('f-age').value      = f.age || '';
-  document.getElementById('f-count').value    = f.count || '';
-  document.getElementById('f-location').value = f.location || '';
-  document.getElementById('f-notes').value    = f.notes || '';
+  editingId         = id;
+  currentMarkers    = [...(f.markers    || [])];
+  currentNegMarkers = [...(f.negMarkers || [])];
+  currentPhotoUrl   = f.photoUrl || null;
+  originalPhotoUrl  = f.photoUrl || null;
+  pendingPhotoFile  = null;
+  document.getElementById('modal-title').textContent  = 'Edit Tank';
+  document.getElementById('f-tank-id').value   = f.tankId;
+  document.getElementById('f-line').value      = f.line;
+  document.getElementById('f-genotype').value  = f.genotype || '';
+  document.getElementById('f-age').value       = f.age || '';
+  document.getElementById('f-count').value     = f.count || '';
+  document.getElementById('f-location').value  = f.location || '';
+  document.getElementById('f-notes').value     = f.notes || '';
   const statusInput = document.querySelector(`input[name="status"][value="${f.status}"]`);
   if (statusInput) statusInput.checked = true;
   renderMarkerTags();
+  renderNegMarkerTags();
   resetPhotoUI();
   if (currentPhotoUrl) showPhotoPreview(currentPhotoUrl);
   document.getElementById('fish-modal').classList.add('active');
+  checkScrollLock();
 };
 
 window.closeModal = function() {
   document.getElementById('fish-modal').classList.remove('active');
+  checkScrollLock();
 };
 
 // Photo helpers
@@ -550,31 +537,25 @@ function resetPhotoUI() {
   document.getElementById('photo-preview-wrap').classList.add('hidden');
   document.getElementById('photo-upload-label').classList.remove('hidden');
 }
-
 function showPhotoPreview(url) {
   document.getElementById('f-photo-preview').src = url;
   document.getElementById('photo-preview-wrap').classList.remove('hidden');
   document.getElementById('photo-upload-label').classList.add('hidden');
 }
-
 window.handlePhotoSelect = function(input) {
   const file = input.files[0];
   if (!file) return;
   pendingPhotoFile = file;
   showPhotoPreview(URL.createObjectURL(file));
 };
-
 window.removePhoto = function() {
-  currentPhotoUrl  = null;
-  pendingPhotoFile = null;
-  resetPhotoUI();
+  currentPhotoUrl = null; pendingPhotoFile = null; resetPhotoUI();
 };
 
 window.saveFish = async function(e) {
   e.preventDefault();
   const saveBtn = document.getElementById('save-btn');
-  saveBtn.disabled = true;
-  saveBtn.textContent = 'Saving…';
+  saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
 
   let photoUrl = currentPhotoUrl || '';
   if (pendingPhotoFile && !demoMode) {
@@ -583,27 +564,25 @@ window.saveFish = async function(e) {
       photoUrl = await uploadPhoto(pendingPhotoFile);
     } catch(err) {
       showToast('❌ Photo upload failed: ' + err.message);
-      saveBtn.disabled = false;
-      saveBtn.textContent = 'Save Tank';
-      return;
+      saveBtn.disabled = false; saveBtn.textContent = 'Save Tank'; return;
     }
   }
 
   const tankIdRaw = document.getElementById('f-tank-id').value.trim();
   const record = {
-    tankId:   tankIdRaw,
-    line:     document.getElementById('f-line').value.trim(),
-    genotype: document.getElementById('f-genotype').value.trim(),
-    age:      document.getElementById('f-age').value.trim(),
-    count:    parseInt(document.getElementById('f-count').value) || 0,
-    location: document.getElementById('f-location').value.trim(),
-    markers:  [...currentMarkers],
-    status:   document.querySelector('input[name="status"]:checked').value,
-    notes:    document.getElementById('f-notes').value.trim(),
+    tankId:      tankIdRaw,
+    line:        document.getElementById('f-line').value.trim(),
+    genotype:    document.getElementById('f-genotype').value.trim(),
+    age:         document.getElementById('f-age').value.trim(),
+    count:       parseInt(document.getElementById('f-count').value) || 0,
+    location:    document.getElementById('f-location').value.trim(),
+    markers:     [...currentMarkers],
+    negMarkers:  [...currentNegMarkers],
+    status:      document.querySelector('input[name="status"]:checked').value,
+    notes:       document.getElementById('f-notes').value.trim(),
     photoUrl,
-    updated:  new Date().toISOString().slice(0, 10),
+    updated:     new Date().toISOString().slice(0, 10),
   };
-  // Auto-generate ID if blank
   record.id = record.tankId || `tank-${Date.now()}`;
   if (!record.tankId) record.tankId = record.id;
 
@@ -622,9 +601,7 @@ window.saveFish = async function(e) {
   } else {
     if (tankIdRaw && fishData.find(x => x.tankId === tankIdRaw)) {
       showToast('⚠️ Tank ID already exists');
-      saveBtn.disabled = false;
-      saveBtn.textContent = 'Save Tank';
-      return;
+      saveBtn.disabled = false; saveBtn.textContent = 'Save Tank'; return;
     }
     if (!demoMode) {
       const rowIndex = await appendToSheets(record);
@@ -637,49 +614,56 @@ window.saveFish = async function(e) {
     showToast('✅ Tank added');
   }
 
-  saveBtn.disabled = false;
-  saveBtn.textContent = 'Save Tank';
+  saveBtn.disabled = false; saveBtn.textContent = 'Save Tank';
   closeModal();
   renderAll();
 };
 
-// Markers
+// Positive markers
 window.addMarkerTag = function() {
   const input = document.getElementById('marker-input');
   const val   = input.value.trim();
   if (val && !currentMarkers.includes(val)) { currentMarkers.push(val); renderMarkerTags(); }
-  input.value = '';
-  input.focus();
+  input.value = ''; input.focus();
 };
-
-document.addEventListener('keydown', e => {
-  if (e.target.id === 'marker-input' && e.key === 'Enter') { e.preventDefault(); addMarkerTag(); }
-});
-
 function renderMarkerTags() {
   document.getElementById('markers-container').innerHTML = currentMarkers.map((m, i) =>
     `<span class="marker-tag">${esc(m)}<button type="button" onclick="removeMarker(${i})">×</button></span>`
   ).join('');
 }
-
 window.removeMarker = function(i) { currentMarkers.splice(i, 1); renderMarkerTags(); };
+
+// Negative markers
+window.addNegMarkerTag = function() {
+  const input = document.getElementById('neg-marker-input');
+  const val   = input.value.trim();
+  if (val && !currentNegMarkers.includes(val)) { currentNegMarkers.push(val); renderNegMarkerTags(); }
+  input.value = ''; input.focus();
+};
+function renderNegMarkerTags() {
+  document.getElementById('neg-markers-container').innerHTML = currentNegMarkers.map((m, i) =>
+    `<span class="marker-tag marker-tag-neg">${esc(m)}<button type="button" onclick="removeNegMarker(${i})">×</button></span>`
+  ).join('');
+}
+window.removeNegMarker = function(i) { currentNegMarkers.splice(i, 1); renderNegMarkerTags(); };
+
+document.addEventListener('keydown', e => {
+  if (e.target.id === 'marker-input'     && e.key === 'Enter') { e.preventDefault(); addMarkerTag(); }
+  if (e.target.id === 'neg-marker-input' && e.key === 'Enter') { e.preventDefault(); addNegMarkerTag(); }
+});
 
 // ── Delete ────────────────────────────────────────────────────────────────────
 window.deleteFish = async function(id) {
   if (!confirm('Delete this tank record?')) return;
   const fish = fishData.find(f => f.id === id);
   if (!fish) return;
-
   if (!demoMode && fish._rowIndex) {
     try {
       await deleteSheetRow(fish._rowIndex);
       if (fish.photoUrl) deleteDrivePhoto(fish.photoUrl);
       logChange('Deleted', fish, `Status was: ${fish.status}, Count: ${fish.count}`);
       await fetchFromSheets();
-    } catch(e) {
-      showToast('❌ Delete failed: ' + e.message);
-      return;
-    }
+    } catch(e) { showToast('❌ Delete failed: ' + e.message); return; }
   } else {
     fishData = fishData.filter(f => f.id !== id);
   }
@@ -692,17 +676,15 @@ window.deleteFish = async function(id) {
 window.openDrawer = function(id) {
   const f = fishData.find(x => x.id === id);
   if (!f) return;
-
-  const markersHtml = (f.markers || []).length
-    ? (f.markers || []).map(m => `<span class="m-tag">${esc(m)}</span>`).join(' ')
-    : '<span style="color:var(--text-dim)">None</span>';
+  const posHtml = (f.markers    || []).length ? (f.markers   || []).map(m => `<span class="m-tag">${esc(m)}</span>`).join(' ')        : '<span style="color:var(--text-dim)">None</span>';
+  const negHtml = (f.negMarkers || []).length ? (f.negMarkers|| []).map(m => `<span class="m-tag m-tag-neg">−${esc(m)}</span>`).join(' ') : '<span style="color:var(--text-dim)">None</span>';
+  const photoHtml = f.photoUrl ? `<img class="drawer-photo" src="${esc(f.photoUrl)}" alt="Tank photo" onclick="openLightbox('${esc(f.photoUrl)}')" title="Click to enlarge" />` : '';
 
   document.getElementById('drawer-content').innerHTML = `
-    ${f.photoUrl ? `<img class="drawer-photo" src="${esc(f.photoUrl)}" alt="Tank photo" />` : ''}
+    ${photoHtml}
     <div class="drawer-fish-id">${esc(f.tankId || '—')}</div>
     <div class="drawer-line">${esc(f.line)}</div>
     <span class="status-badge badge-${f.status}" style="margin-top:.25rem;display:inline-block">${esc(f.status)}</span>
-
     <div class="drawer-section">
       <h4>Details</h4>
       <div class="drawer-row"><span class="drawer-row-label">Genotype</span><span class="drawer-row-val">${esc(f.genotype || '—')}</span></div>
@@ -711,31 +693,40 @@ window.openDrawer = function(id) {
       <div class="drawer-row"><span class="drawer-row-label">Location</span><span class="drawer-row-val">${esc(f.location || '—')}</span></div>
       <div class="drawer-row"><span class="drawer-row-label">Last Updated</span><span class="drawer-row-val">${esc(f.updated || '—')}</span></div>
     </div>
-
     <div class="drawer-section">
-      <h4>Markers / Transgenes</h4>
-      <div style="display:flex;flex-wrap:wrap;gap:.35rem;padding:.5rem 0">${markersHtml}</div>
+      <h4>Positive Markers</h4>
+      <div style="display:flex;flex-wrap:wrap;gap:.35rem;padding:.5rem 0">${posHtml}</div>
     </div>
-
-    ${f.notes ? `
     <div class="drawer-section">
-      <h4>Notes</h4>
-      <p style="font-size:.88rem;color:var(--text-muted);line-height:1.5">${esc(f.notes)}</p>
-    </div>` : ''}
-
+      <h4>Negative Markers</h4>
+      <div style="display:flex;flex-wrap:wrap;gap:.35rem;padding:.5rem 0">${negHtml}</div>
+    </div>
+    ${f.notes ? `<div class="drawer-section"><h4>Notes</h4><p style="font-size:.88rem;color:var(--text-muted);line-height:1.5">${esc(f.notes)}</p></div>` : ''}
     <div class="drawer-actions">
       <button class="btn-primary" onclick="closeDrawer();openEditModal('${esc(f.id)}')">Edit</button>
-      <button class="btn-ghost" onclick="closeDrawer();deleteFish('${esc(f.id)}')">Delete</button>
+      <button class="btn-ghost"   onclick="closeDrawer();deleteFish('${esc(f.id)}')">Delete</button>
     </div>
   `;
-
   document.getElementById('detail-drawer').classList.add('open');
   document.getElementById('drawer-backdrop').classList.add('active');
+  checkScrollLock();
 };
 
 window.closeDrawer = function() {
   document.getElementById('detail-drawer').classList.remove('open');
   document.getElementById('drawer-backdrop').classList.remove('active');
+  checkScrollLock();
+};
+
+// ── Photo lightbox ────────────────────────────────────────────────────────────
+window.openLightbox = function(src) {
+  document.getElementById('lightbox-img').src = src;
+  document.getElementById('photo-lightbox').classList.add('active');
+  checkScrollLock();
+};
+window.closeLightbox = function() {
+  document.getElementById('photo-lightbox').classList.remove('active');
+  checkScrollLock();
 };
 
 // ── Barcode Scanner ───────────────────────────────────────────────────────────
@@ -744,38 +735,35 @@ let scannerRunning = false;
 window.openScanner = function(context = 'search') {
   scannerContext = context;
   document.getElementById('scan-overlay').classList.add('active');
-  document.getElementById('scan-status').textContent = 'Initializing camera…';
-  document.getElementById('manual-barcode').value = '';
+  document.getElementById('scan-status').textContent  = 'Initializing camera…';
+  document.getElementById('manual-barcode').value     = '';
+  checkScrollLock();
   startQuagga();
 };
 
 window.closeScanner = function() {
   document.getElementById('scan-overlay').classList.remove('active');
   stopQuagga();
+  checkScrollLock();
 };
 
 function startQuagga() {
   if (typeof Quagga === 'undefined') {
-    document.getElementById('scan-status').textContent = 'Scanner not available. Use manual entry.';
-    return;
+    document.getElementById('scan-status').textContent = 'Scanner not available. Use manual entry.'; return;
   }
   Quagga.init({
-    inputStream: {
-      name: 'Live', type: 'LiveStream',
-      target: document.querySelector('#interactive'),
-      constraints: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
-    },
-    decoder: { readers: ['code_128_reader','ean_reader','ean_8_reader','code_39_reader','upc_reader'] },
+    inputStream: { name: 'Live', type: 'LiveStream', target: document.querySelector('#interactive'), constraints: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } },
+    decoder:     { readers: ['code_128_reader','ean_reader','ean_8_reader','code_39_reader','upc_reader'] },
     locate: true,
   }, err => {
     if (err) { document.getElementById('scan-status').textContent = 'Camera error — use manual entry.'; return; }
-    Quagga.start();
-    scannerRunning = true;
+    Quagga.start(); scannerRunning = true;
     document.getElementById('scan-status').textContent = 'Point camera at barcode…';
   });
   Quagga.onDetected(result => {
     stopQuagga();
     document.getElementById('scan-overlay').classList.remove('active');
+    checkScrollLock();
     handleBarcode(result.codeResult.code);
   });
 }
@@ -793,33 +781,21 @@ window.manualBarcode = function() {
   closeScanner();
   handleBarcode(val);
 };
-
-document.addEventListener('keydown', e => {
-  if (e.target.id === 'manual-barcode' && e.key === 'Enter') manualBarcode();
-});
+document.addEventListener('keydown', e => { if (e.target.id === 'manual-barcode' && e.key === 'Enter') manualBarcode(); });
 
 function handleBarcode(code) {
   showToast(`📷 Scanned: ${code}`);
-  if (scannerContext === 'modal') {
-    document.getElementById('f-tank-id').value = code;
-    return;
-  }
+  if (scannerContext === 'modal') { document.getElementById('f-tank-id').value = code; return; }
   const found = fishData.find(f => f.tankId === code);
-  if (found) {
-    openDrawer(found.id);
-  } else {
-    openAddModal();
-    document.getElementById('f-tank-id').value = code;
-    showToast(`No tank found for "${code}" — pre-filled form`);
-  }
+  if (found) { openDrawer(found.id); }
+  else { openAddModal(); document.getElementById('f-tank-id').value = code; showToast(`No tank found for "${code}" — pre-filled form`); }
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
 let toastTimer;
 function showToast(msg) {
   const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
+  t.textContent = msg; t.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
 }
@@ -827,6 +803,6 @@ function showToast(msg) {
 // ── Keyboard shortcuts ────────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
   if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); document.getElementById('search-input')?.focus(); }
-  if (e.key === 'Escape') { closeModal(); closeDrawer(); closeScanner(); }
+  if (e.key === 'Escape') { closeModal(); closeDrawer(); closeScanner(); closeLightbox(); }
   if ((e.metaKey || e.ctrlKey) && e.key === 'n') { e.preventDefault(); openAddModal(); }
 });

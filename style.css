@@ -384,13 +384,23 @@ body {
 /* Drawer photo */
 .drawer-photo {
   width: 100%; border-radius: var(--radius); margin-bottom: 1rem;
-  max-height: 220px; object-fit: cover; display: block;
+  max-height: 320px; object-fit: cover; display: block;
+  cursor: zoom-in;
+}
+
+/* Lightbox */
+#photo-lightbox { z-index: 600; cursor: zoom-out; background: rgba(0,0,0,.92); }
+.lightbox-img {
+  max-width: 95vw; max-height: 92vh;
+  object-fit: contain; border-radius: var(--radius);
+  box-shadow: 0 8px 48px rgba(0,0,0,.6);
 }
 
 /* ── App Layout ── */
 .app { display: flex; flex-direction: column; min-height: 100dvh; }
 .hidden { display: none !important; }
 .visually-hidden { display: none; }
+body.modal-open { overflow: hidden; }
 
 /* Header */
 .app-header {
@@ -541,6 +551,14 @@ body {
   flex-shrink: 0;
 }
 .sort-select:focus { outline: none; border-color: var(--accent); }
+.sort-dir-btn {
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text-muted); border-radius: var(--radius-sm);
+  width: 28px; height: 28px; font-size: .9rem; cursor: pointer; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color var(--transition), color var(--transition);
+}
+.sort-dir-btn:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ── Fish Grid ── */
 .fish-grid {
@@ -630,6 +648,16 @@ body {
   background: rgba(188,140,255,.1); border: 1px solid rgba(188,140,255,.3);
   color: var(--purple); padding: .1rem .5rem; border-radius: 99px;
 }
+.m-tag-neg {
+  background: rgba(248,81,73,.1); border-color: rgba(248,81,73,.35);
+  color: var(--red);
+}
+.marker-tag-neg {
+  background: rgba(248,81,73,.12); border-color: rgba(248,81,73,.4);
+  color: var(--red);
+}
+.marker-tag-neg button { color: var(--red); }
+.btn-tag-neg:hover { background: var(--red); color: #fff; }
 
 .card-actions {
   display: flex; gap: .4rem; justify-content: flex-end;

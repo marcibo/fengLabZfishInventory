@@ -86,13 +86,23 @@
           <input id="f-location" type="text" placeholder="e.g. Rack 3A, Shelf 2" />
         </div>
         <div class="form-group full-width">
-          <label>Markers / Transgenes</label>
-          <p class="field-note">Only put in transgenes that are known to be positive!</p>
+          <label>Positive Markers (+)</label>
+          <p class="field-note">Only add transgenes confirmed to be present!</p>
           <div id="markers-container" class="tag-input-area"></div>
           <div class="tag-add-row">
             <input id="marker-input" type="text" list="markers-datalist" placeholder="Add marker (e.g. EGFP, mCherry…)" />
             <datalist id="markers-datalist"></datalist>
             <button type="button" class="btn-tag-add" onclick="addMarkerTag()">+</button>
+          </div>
+        </div>
+        <div class="form-group full-width">
+          <label>Negative Markers (−)</label>
+          <p class="field-note">Transgenes confirmed to be absent.</p>
+          <div id="neg-markers-container" class="tag-input-area"></div>
+          <div class="tag-add-row">
+            <input id="neg-marker-input" type="text" list="neg-markers-datalist" placeholder="Add negative marker…" />
+            <datalist id="neg-markers-datalist"></datalist>
+            <button type="button" class="btn-tag-add btn-tag-neg" onclick="addNegMarkerTag()">+</button>
           </div>
         </div>
         <div class="form-group full-width">
@@ -217,6 +227,7 @@
         <option value="count">Count</option>
         <option value="updated">Last Updated</option>
       </select>
+      <button class="sort-dir-btn" id="sort-dir-btn" onclick="toggleSortDir()" title="Toggle sort direction">↑</button>
     </div>
   </div>
 
@@ -232,6 +243,11 @@
   <!-- FAB for mobile -->
   <button class="fab" onclick="openAddModal()">+</button>
 
+</div>
+
+<!-- Photo lightbox -->
+<div id="photo-lightbox" class="overlay" onclick="closeLightbox()">
+  <img id="lightbox-img" class="lightbox-img" alt="Tank photo" />
 </div>
 
 <!-- Toast -->
