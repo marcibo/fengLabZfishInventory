@@ -287,12 +287,12 @@ body {
 }
 .marker-tag {
   display: inline-flex; align-items: center; gap: .3rem;
-  background: rgba(188,140,255,.15); border: 1px solid rgba(188,140,255,.4);
-  color: var(--purple); border-radius: 99px;
+  background: rgba(63,185,80,.15); border: 1px solid rgba(63,185,80,.4);
+  color: var(--green); border-radius: 99px;
   padding: .15rem .65rem; font-size: .8rem; font-family: var(--font-mono);
 }
 .marker-tag button {
-  background: none; border: none; color: var(--purple);
+  background: none; border: none; color: var(--green);
   cursor: pointer; font-size: .75rem; padding: 0; line-height: 1;
   opacity: .7;
 }
@@ -609,7 +609,7 @@ body.modal-open { overflow: hidden; }
 .mf-status-dot  { font-size: .65rem; flex-shrink: 0; }
 .mf-row-label   { flex: 1; font-family: var(--font-body); }
 .mf-row-count   { font-family: var(--font-mono); font-size: .82rem; color: var(--text-muted); }
-.mf-marker-pos  { font-family: var(--font-mono); color: var(--purple); }
+.mf-marker-pos  { font-family: var(--font-mono); color: var(--green); }
 .mf-marker-neg  { font-family: var(--font-mono); color: var(--red); }
 
 .mf-sort-row {
@@ -653,7 +653,7 @@ body.modal-open { overflow: hidden; }
   transition: border-color var(--transition), color var(--transition);
 }
 .marker-filter-btn:hover,
-.marker-filter-btn.active { border-color: var(--accent); color: var(--accent); }
+.marker-filter-btn.active { border-color: var(--green); color: var(--green); }
 .neg-filter-btn { color: var(--text-muted); }
 .neg-filter-btn:hover,
 .neg-filter-btn.active { border-color: var(--red); color: var(--red); }
@@ -683,7 +683,7 @@ body.modal-open { overflow: hidden; }
   padding: .5rem .85rem; font-size: .85rem; cursor: pointer;
   transition: border-color var(--transition), color var(--transition);
 }
-.marker-picker-btn:hover     { border-color: var(--purple); color: var(--purple); }
+.marker-picker-btn:hover     { border-color: var(--green); color: var(--green); }
 .marker-picker-btn-neg:hover { border-color: var(--red);    color: var(--red);    }
 
 .marker-picker-dropdown {
@@ -700,8 +700,8 @@ body.modal-open { overflow: hidden; }
   transition: background var(--transition);
 }
 .mpick-row:hover    { background: var(--surface2); }
-.mpick-row.mpick-checked { background: rgba(188,140,255,.08); }
-.mpick-row input    { accent-color: var(--purple); flex-shrink: 0; }
+.mpick-row.mpick-checked { background: rgba(63,185,80,.08); }
+.mpick-row input    { accent-color: var(--green); flex-shrink: 0; }
 .mpick-divider {
   font-size: .7rem; color: var(--text-dim); text-align: center;
   padding: .4rem .9rem .25rem;
@@ -837,8 +837,8 @@ body.modal-open { overflow: hidden; }
 }
 .m-tag {
   font-family: var(--font-mono); font-size: .72rem;
-  background: rgba(188,140,255,.1); border: 1px solid rgba(188,140,255,.3);
-  color: var(--purple); padding: .1rem .5rem; border-radius: 99px;
+  background: rgba(63,185,80,.1); border: 1px solid rgba(63,185,80,.3);
+  color: var(--green); padding: .1rem .5rem; border-radius: 99px;
 }
 .m-tag-neg {
   background: rgba(248,81,73,.1); border-color: rgba(248,81,73,.35);
