@@ -82,20 +82,22 @@
           <label>Positive Markers (+)</label>
           <p class="field-note">Only add transgenes confirmed to be present!</p>
           <div id="markers-container" class="tag-input-area"></div>
-          <div class="tag-add-row">
-            <input id="marker-input" type="text" list="markers-datalist" placeholder="Add marker (e.g. EGFP, mCherry…)" />
-            <datalist id="markers-datalist"></datalist>
-            <button type="button" class="btn-tag-add" onclick="addMarkerTag()">+</button>
+          <div class="marker-picker-wrap" id="pos-picker-wrap">
+            <button type="button" class="marker-picker-btn" onclick="togglePosPicker()">
+              + Add Marker ▾
+            </button>
+            <div id="pos-picker-dropdown" class="marker-picker-dropdown hidden"></div>
           </div>
         </div>
         <div class="form-group full-width">
           <label>Negative Markers (−)</label>
           <p class="field-note">Transgenes confirmed to be absent.</p>
           <div id="neg-markers-container" class="tag-input-area"></div>
-          <div class="tag-add-row">
-            <input id="neg-marker-input" type="text" list="neg-markers-datalist" placeholder="Add negative marker…" />
-            <datalist id="neg-markers-datalist"></datalist>
-            <button type="button" class="btn-tag-add btn-tag-neg" onclick="addNegMarkerTag()">+</button>
+          <div class="marker-picker-wrap" id="neg-picker-wrap">
+            <button type="button" class="marker-picker-btn marker-picker-btn-neg" onclick="toggleNegPicker()">
+              − Add Marker ▾
+            </button>
+            <div id="neg-picker-dropdown" class="marker-picker-dropdown hidden"></div>
           </div>
         </div>
         <div class="form-group full-width">

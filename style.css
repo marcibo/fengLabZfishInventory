@@ -674,6 +674,49 @@ body.modal-open { overflow: hidden; }
 .marker-check input { accent-color: var(--accent); }
 .marker-dropdown-empty { font-size: .8rem; color: var(--text-dim); padding: .25rem .5rem; }
 
+/* ── Marker picker (Add/Edit modal) ── */
+.marker-picker-wrap { position: relative; margin-top: .35rem; }
+.marker-picker-btn {
+  width: 100%; text-align: left;
+  background: var(--surface2); border: 1.5px dashed var(--border);
+  color: var(--text-muted); border-radius: var(--radius-sm);
+  padding: .5rem .85rem; font-size: .85rem; cursor: pointer;
+  transition: border-color var(--transition), color var(--transition);
+}
+.marker-picker-btn:hover     { border-color: var(--purple); color: var(--purple); }
+.marker-picker-btn-neg:hover { border-color: var(--red);    color: var(--red);    }
+
+.marker-picker-dropdown {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  max-height: 230px; overflow-y: auto; z-index: 250;
+  padding: .3rem 0;
+}
+.mpick-row {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .45rem .9rem; font-size: .87rem; cursor: pointer;
+  font-family: var(--font-mono);
+  transition: background var(--transition);
+}
+.mpick-row:hover    { background: var(--surface2); }
+.mpick-row.mpick-checked { background: rgba(188,140,255,.08); }
+.mpick-row input    { accent-color: var(--purple); flex-shrink: 0; }
+.mpick-divider {
+  font-size: .7rem; color: var(--text-dim); text-align: center;
+  padding: .4rem .9rem .25rem;
+  border-top: 1px solid var(--border); margin-top: .2rem;
+}
+.mpick-new-row {
+  display: flex; gap: .4rem; padding: .4rem .9rem .5rem;
+}
+.mpick-new-input {
+  flex: 1; padding: .4rem .65rem;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text); font-size: .85rem;
+}
+.mpick-new-input:focus { outline: none; border-color: var(--accent); }
+
 /* Field note */
 .field-note {
   font-size: .74rem; color: var(--orange);

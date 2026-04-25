@@ -726,6 +726,8 @@ window.openEditModal = function(id) {
 
 window.closeModal = function() {
   document.getElementById('fish-modal').classList.remove('active');
+  document.getElementById('pos-picker-dropdown')?.classList.add('hidden');
+  document.getElementById('neg-picker-dropdown')?.classList.add('hidden');
   checkScrollLock();
 };
 
@@ -814,35 +816,117 @@ window.saveFish = async function(e) {
   closeModal(); renderAll();
 };
 
-// Positive markers
-window.addMarkerTag = function() {
-  const i = document.getElementById('marker-input');
-  const v = i.value.trim();
-  if (v && !currentMarkers.includes(v)) { currentMarkers.push(v); renderMarkerTags(); }
-  i.value = ''; i.focus();
-};
+// ── Marker tag rendering ──────────────────────────────────────────────────────
 function renderMarkerTags() {
   document.getElementById('markers-container').innerHTML = currentMarkers.map((m, i) =>
     `<span class="marker-tag">${esc(m)}<button type="button" onclick="removeMarker(${i})">×</button></span>`).join('');
 }
-window.removeMarker = function(i) { currentMarkers.splice(i, 1); renderMarkerTags(); };
+window.removeMarker = function(i) { currentMarkers.splice(i, 1); renderMarkerTags(); refreshPosPicker(); };
 
-// Negative markers
-window.addNegMarkerTag = function() {
-  const i = document.getElementById('neg-marker-input');
-  const v = i.value.trim();
-  if (v && !currentNegMarkers.includes(v)) { currentNegMarkers.push(v); renderNegMarkerTags(); }
-  i.value = ''; i.focus();
-};
 function renderNegMarkerTags() {
   document.getElementById('neg-markers-container').innerHTML = currentNegMarkers.map((m, i) =>
     `<span class="marker-tag marker-tag-neg">${esc(m)}<button type="button" onclick="removeNegMarker(${i})">×</button></span>`).join('');
 }
-window.removeNegMarker = function(i) { currentNegMarkers.splice(i, 1); renderNegMarkerTags(); };
+window.removeNegMarker = function(i) { currentNegMarkers.splice(i, 1); renderNegMarkerTags(); refreshNegPicker(); };
 
-document.addEventListener('keydown', e => {
-  if (e.target.id === 'marker-input'     && e.key === 'Enter') { e.preventDefault(); addMarkerTag(); }
-  if (e.target.id === 'neg-marker-input' && e.key === 'Enter') { e.preventDefault(); addNegMarkerTag(); }
+// ── Marker picker dropdowns (in Add/Edit modal) ───────────────────────────────
+function buildPickerHtml(allMarkers, currentList, toggleFn, newInputId) {
+  let html = '';
+  if (allMarkers.length) {
+    html += allMarkers.map(m => {
+      const on = currentList.includes(m);
+      return `<label class="mpick-row${on ? ' mpick-checked' : ''}">
+        <input type="checkbox" ${on ? 'checked' : ''}
+          onchange="${toggleFn}('${esc(m)}', this.checked)" />
+        ${esc(m)}
+      </label>`;
+    }).join('');
+    html += '<div class="mpick-divider">── or type new ──</div>';
+  }
+  html += `<div class="mpick-new-row">
+    <input type="text" id="${newInputId}" class="mpick-new-input" placeholder="New marker…"
+      onkeydown="if(event.key==='Enter'){event.preventDefault();addNewMarker('${newInputId}')}" />
+    <button type="button" class="btn-tag-add" onclick="addNewMarker('${newInputId}')">+</button>
+  </div>`;
+  return html;
+}
+
+function refreshPosPicker() {
+  const dd = document.getElementById('pos-picker-dropdown');
+  if (!dd || dd.classList.contains('hidden')) return;
+  const prev = document.getElementById('pos-new-input')?.value || '';
+  dd.innerHTML = buildPickerHtml(uniquePosMarkers(), currentMarkers, 'toggleMarkerInPicker', 'pos-new-input');
+  const ni = document.getElementById('pos-new-input');
+  if (ni) ni.value = prev;
+}
+function refreshNegPicker() {
+  const dd = document.getElementById('neg-picker-dropdown');
+  if (!dd || dd.classList.contains('hidden')) return;
+  const prev = document.getElementById('neg-new-input')?.value || '';
+  dd.innerHTML = buildPickerHtml(uniqueNegMarkers(), currentNegMarkers, 'toggleNegMarkerInPicker', 'neg-new-input');
+  const ni = document.getElementById('neg-new-input');
+  if (ni) ni.value = prev;
+}
+
+window.togglePosPicker = function() {
+  const dd = document.getElementById('pos-picker-dropdown');
+  const opening = dd.classList.contains('hidden');
+  document.getElementById('pos-picker-dropdown').classList.add('hidden');
+  document.getElementById('neg-picker-dropdown').classList.add('hidden');
+  if (opening) {
+    dd.innerHTML = buildPickerHtml(uniquePosMarkers(), currentMarkers, 'toggleMarkerInPicker', 'pos-new-input');
+    dd.classList.remove('hidden');
+    setTimeout(() => document.getElementById('pos-new-input')?.focus(), 50);
+  }
+};
+
+window.toggleNegPicker = function() {
+  const dd = document.getElementById('neg-picker-dropdown');
+  const opening = dd.classList.contains('hidden');
+  document.getElementById('pos-picker-dropdown').classList.add('hidden');
+  document.getElementById('neg-picker-dropdown').classList.add('hidden');
+  if (opening) {
+    dd.innerHTML = buildPickerHtml(uniqueNegMarkers(), currentNegMarkers, 'toggleNegMarkerInPicker', 'neg-new-input');
+    dd.classList.remove('hidden');
+    setTimeout(() => document.getElementById('neg-new-input')?.focus(), 50);
+  }
+};
+
+window.toggleMarkerInPicker = function(m, checked) {
+  if (checked && !currentMarkers.includes(m)) currentMarkers.push(m);
+  else if (!checked) currentMarkers = currentMarkers.filter(x => x !== m);
+  renderMarkerTags(); refreshPosPicker();
+};
+
+window.toggleNegMarkerInPicker = function(m, checked) {
+  if (checked && !currentNegMarkers.includes(m)) currentNegMarkers.push(m);
+  else if (!checked) currentNegMarkers = currentNegMarkers.filter(x => x !== m);
+  renderNegMarkerTags(); refreshNegPicker();
+};
+
+window.addNewMarker = function(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const v = input.value.trim();
+  if (!v) return;
+  if (inputId === 'pos-new-input') {
+    if (!currentMarkers.includes(v)) { currentMarkers.push(v); renderMarkerTags(); }
+    refreshPosPicker();
+  } else {
+    if (!currentNegMarkers.includes(v)) { currentNegMarkers.push(v); renderNegMarkerTags(); }
+    refreshNegPicker();
+  }
+  input.value = ''; input.focus();
+};
+
+// Close picker dropdowns on outside click
+document.addEventListener('click', e => {
+  ['pos-picker-wrap', 'neg-picker-wrap'].forEach(id => {
+    const wrap = document.getElementById(id);
+    if (wrap && !wrap.contains(e.target)) {
+      wrap.querySelector('.marker-picker-dropdown')?.classList.add('hidden');
+    }
+  });
 });
 
 // ── Delete ────────────────────────────────────────────────────────────────────
