@@ -58,6 +58,13 @@
     <h2 id="modal-title">Add Tank</h2>
     <form id="fish-form" onsubmit="saveFish(event)">
       <div class="form-grid">
+        <div class="form-group full-width">
+          <label>Tank ID</label>
+          <div class="input-with-btn">
+            <input id="f-tank-id" type="text" placeholder="Auto-generated if left blank" />
+            <button type="button" class="btn-scan-inline" onclick="openScannerForForm()" title="Scan barcode">📷</button>
+          </div>
+        </div>
         <div class="form-group">
           <label>Line Name *</label>
           <input id="f-line" type="text" required placeholder="e.g. Tg(fli1:EGFP)" />

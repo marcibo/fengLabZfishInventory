@@ -28,6 +28,7 @@ let pendingPhotoFile  = null;
 let editingId         = null;
 let demoMode          = false;
 let scannerRunning    = false;
+let scanForForm       = false;
 let sortDir           = -1;  // -1 = desc (newest first), 1 = asc
 
 // A  B     C         D    E      F         G            H       I      J        K      L
@@ -348,6 +349,13 @@ function formatDate(d) {
   return isNaN(dt) ? d : dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+function calcDpf(d) {
+  if (!d) return '?';
+  const dt = new Date(d + 'T00:00:00');
+  if (isNaN(dt)) return '?';
+  return Math.floor((Date.now() - dt.getTime()) / 86400000);
+}
+
 function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
@@ -426,10 +434,11 @@ function renderGrid() {
     card.innerHTML = `
       ${thumbHtml}
       <div class="card-header">
-        <span class="fert-date">${f.age ? formatDate(f.age) : ''}</span>
+        <span class="fert-date">${f.age ? formatDate(f.age) + ' · ' + calcDpf(f.age) + ' dpf' : ''}</span>
         <span class="status-badge badge-${f.status}">${esc(f.status)}</span>
       </div>
       <div class="line-name">${esc(f.line)}</div>
+      ${f.tankId ? `<div class="tank-id">${esc(f.tankId)}</div>` : ''}
       ${f.genotype ? `<div class="genotype">${esc(f.genotype)}</div>` : ''}
       <div class="card-meta">
         ${f.count    ? `<span class="meta-item"><span class="meta-icon">🐟</span>${f.count}</span>` : ''}
@@ -695,6 +704,7 @@ window.openAddModal = function() {
   currentPhotoUrl = null; originalPhotoUrl = null; pendingPhotoFile = null;
   document.getElementById('modal-title').textContent = 'Add Tank';
   document.getElementById('fish-form').reset();
+  document.getElementById('f-tank-id').value             = '';
   document.getElementById('markers-container').innerHTML     = '';
   document.getElementById('neg-markers-container').innerHTML = '';
   document.querySelector('input[name="status"][value="Active"]').checked = true;
@@ -709,6 +719,7 @@ window.openEditModal = function(id) {
   editingId = id; currentMarkers = [...(f.markers || [])]; currentNegMarkers = [...(f.negMarkers || [])];
   currentPhotoUrl = f.photoUrl || null; originalPhotoUrl = f.photoUrl || null; pendingPhotoFile = null;
   document.getElementById('modal-title').textContent = 'Edit Tank';
+  document.getElementById('f-tank-id').value  = f.tankId || f.id || '';
   document.getElementById('f-line').value     = f.line;
   document.getElementById('f-genotype').value = f.genotype || '';
   document.getElementById('f-age').value      = f.age || '';
@@ -764,7 +775,7 @@ window.saveFish = async function(e) {
   }
 
   const record = {
-    tankId:     editingId ? (fishData.find(x => x.id === editingId)?.tankId || editingId) : `tank-${Date.now()}`,
+    tankId:     document.getElementById('f-tank-id').value.trim() || (editingId ? (fishData.find(x => x.id === editingId)?.tankId || editingId) : `tank-${Date.now()}`),
     line:       document.getElementById('f-line').value.trim(),
     genotype:   document.getElementById('f-genotype').value.trim(),
     age:        document.getElementById('f-age').value.trim(),
@@ -1015,6 +1026,14 @@ window.closeLightbox = function() {
 
 // ── Barcode Scanner ───────────────────────────────────────────────────────────
 window.openScanner = function() {
+  scanForForm = false;
+  document.getElementById('scan-overlay').classList.add('active');
+  document.getElementById('scan-status').textContent = 'Initializing camera…';
+  document.getElementById('manual-barcode').value    = '';
+  checkScrollLock(); startQuagga();
+};
+window.openScannerForForm = function() {
+  scanForForm = true;
   document.getElementById('scan-overlay').classList.add('active');
   document.getElementById('scan-status').textContent = 'Initializing camera…';
   document.getElementById('manual-barcode').value    = '';
@@ -1022,6 +1041,7 @@ window.openScanner = function() {
 };
 window.closeScanner = function() {
   document.getElementById('scan-overlay').classList.remove('active');
+  scanForForm = false;
   stopQuagga(); checkScrollLock();
 };
 function startQuagga() {
@@ -1039,11 +1059,17 @@ function startQuagga() {
     stopQuagga();
     document.getElementById('scan-overlay').classList.remove('active');
     checkScrollLock();
-    const code  = result.codeResult.code;
+    const code = result.codeResult.code;
+    if (scanForForm) {
+      scanForForm = false;
+      document.getElementById('f-tank-id').value = code;
+      showToast(`📷 Scanned: ${code}`);
+      return;
+    }
     const found = fishData.find(f => f.tankId === code);
     showToast(`📷 Scanned: ${code}`);
     if (found) openDrawer(found.id);
-    else { openAddModal(); showToast(`No tank found for "${code}"`); }
+    else { openAddModal(); document.getElementById('f-tank-id').value = code; }
   });
 }
 function stopQuagga() {
@@ -1053,10 +1079,16 @@ window.manualBarcode = function() {
   const v = document.getElementById('manual-barcode').value.trim();
   if (!v) return;
   closeScanner();
+  if (scanForForm) {
+    scanForForm = false;
+    document.getElementById('f-tank-id').value = v;
+    showToast(`📷 Entered: ${v}`);
+    return;
+  }
   const found = fishData.find(f => f.tankId === v);
   showToast(`📷 Scanned: ${v}`);
   if (found) openDrawer(found.id);
-  else { openAddModal(); showToast(`No tank found for "${v}"`); }
+  else { openAddModal(); document.getElementById('f-tank-id').value = v; }
 };
 document.addEventListener('keydown', e => { if (e.target.id === 'manual-barcode' && e.key === 'Enter') manualBarcode(); });
 
