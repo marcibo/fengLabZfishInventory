@@ -45,12 +45,12 @@ const COL = {
 
 // ── Demo data ────────────────────────────────────────────────────────────────
 const DEMO = [
-  { tankId:'demo-1', line:'Tg(fli1:EGFP)',     genotype:'+;+', age:'2025-01-10', count:12, location:'Rack 1A, Shelf 2', markers:['EGFP','fli1'],    negMarkers:[],        status:'Active',    notes:'Healthy, spawning well', photoUrl:'', updated:'2025-04-20' },
-  { tankId:'demo-2', line:'Tg(gata1:DsRed)',   genotype:'+;-', age:'2025-02-01', count:8,  location:'Rack 1A, Shelf 3', markers:['DsRed','gata1'],  negMarkers:['fli1'],  status:'Breeding',  notes:'Set up breeding pair',   photoUrl:'', updated:'2025-04-22' },
-  { tankId:'demo-3', line:'casper',            genotype:'?;?', age:'2024-12-05', count:3,  location:'Rack 2B, Shelf 1', markers:[],                 negMarkers:[],        status:'Low Stock', notes:'Need to expand',          photoUrl:'', updated:'2025-04-15' },
-  { tankId:'demo-4', line:'Tg(mpeg1:mCherry)', genotype:'+;+', age:'2025-03-15', count:20, location:'Rack 2B, Shelf 4', markers:['mCherry','mpeg1'], negMarkers:['DsRed'], status:'Active',    notes:'',                       photoUrl:'', updated:'2025-04-21' },
-  { tankId:'demo-5', line:'AB wild-type',      genotype:'-;-', age:'2024-10-01', count:6,  location:'Rack 3C, Shelf 1', markers:[],                 negMarkers:[],        status:'Archived',  notes:'Retired breeders',        photoUrl:'', updated:'2025-03-10' },
-  { tankId:'demo-6', line:'Tg(huc:GCaMP6s)',  genotype:'+;+', age:'2025-03-01', count:15, location:'Rack 1B, Shelf 1', markers:['GCaMP6s','huc'],  negMarkers:[],        status:'Nursery',   notes:'Imaging stock',           photoUrl:'', updated:'2025-04-23' },
+  { tankId:'demo-1', line:'fli1:EGFP',     genotype:'+;+', age:'2025-01-10', count:12, location:'R1 S2', markers:['EGFP','fli1'],    negMarkers:[],        status:'Active',    notes:'Healthy, spawning well', photoUrl:'', updated:'2025-04-20' },
+  { tankId:'demo-2', line:'gata1:DsRed x AB',   genotype:'+;-', age:'2025-02-01', count:8,  location:'R1A S3', markers:['DsRed','gata1'],  negMarkers:['fli1'],  status:'Breeding',  notes:'Set up breeding pair',   photoUrl:'', updated:'2025-04-22' },
+  { tankId:'demo-3', line:'casper',            genotype:'', age:'2024-12-05', count:3,  location:'R2B S3', markers:[],                 negMarkers:[],        status:'Low Stock', notes:'Need to expand',          photoUrl:'', updated:'2025-04-15' },
+  { tankId:'demo-4', line:'mpeg1:mCherry', genotype:'?', age:'2025-03-15', count:20, location:'R2A S4', markers:[], negMarkers:['DsRed'], status:'Active',    notes:'mpeg?',                       photoUrl:'', updated:'2025-04-21' },
+  { tankId:'demo-5', line:'AB WT',      genotype:'-;-', age:'2024-10-01', count:6,  location:'R3 S1', markers:[],                 negMarkers:[],        status:'Archived',  notes:'Retired breeders',        photoUrl:'', updated:'2025-03-10' },
+  { tankId:'demo-6', line:'Tg(huc:GCaMP6s)',  genotype:'+;+', age:'2025-03-01', count:15, location:'N1 S1', markers:['GCaMP6s','huc'],  negMarkers:[],        status:'Nursery',   notes:'Imaging stock',           photoUrl:'', updated:'2025-04-23' },
 ];
 
 // ── Init ─────────────────────────────────────────────────────────────────────
