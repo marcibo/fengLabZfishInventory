@@ -347,12 +347,16 @@ window.enterExperiment = function(idx) {
   document.getElementById('exp-name-display').textContent = exp.name;
   document.getElementById('exp-name-input').classList.add('hidden');
   document.getElementById('exp-name-display').classList.remove('hidden');
+  document.getElementById('filter-panel')?.classList.add('exp-mode');
+  document.getElementById('filter-toggle-bar')?.classList.add('exp-mode');
   renderAll();
 };
 
 window.exitExperiment = function() {
   currentExperiment = null;
   document.getElementById('experiment-bar').classList.add('hidden');
+  document.getElementById('filter-panel')?.classList.remove('exp-mode');
+  document.getElementById('filter-toggle-bar')?.classList.remove('exp-mode');
   renderAll();
 };
 
@@ -447,13 +451,34 @@ window.removeFromExperiment = function(tankId, event) {
 };
 
 // ── Tank picker ───────────────────────────────────────────────────────────────
+let pickerActiveStatus = null;
+
 window.openTankPicker = function() {
   if (!currentExperiment) return;
-  pickerSelected = new Set(currentExperiment.tankIds);
+  pickerSelected   = new Set(currentExperiment.tankIds);
+  pickerActiveStatus = null;
   document.getElementById('picker-search').value = '';
-  renderPickerGrid('');
+  document.getElementById('picker-sort').value   = 'line';
+  buildPickerStatusChips();
+  renderPickerGrid();
   document.getElementById('tank-picker-overlay').classList.add('active');
   document.body.classList.add('modal-open');
+};
+
+function buildPickerStatusChips() {
+  const statuses = ['Active','Nursery','Incubator','Low Stock','Breeding','Archived'];
+  const wrap = document.getElementById('picker-status-chips');
+  if (!wrap) return;
+  wrap.innerHTML = statuses.map(s =>
+    `<button class="chip picker-status-chip${pickerActiveStatus === s ? ' active' : ''}"
+      onclick="setPickerStatus('${s}')">${s}</button>`
+  ).join('');
+}
+
+window.setPickerStatus = function(status) {
+  pickerActiveStatus = pickerActiveStatus === status ? null : status;
+  buildPickerStatusChips();
+  renderPickerGrid();
 };
 
 window.closeTankPicker = function() {
@@ -462,19 +487,32 @@ window.closeTankPicker = function() {
 };
 
 window.filterPicker = function() {
-  renderPickerGrid(document.getElementById('picker-search').value);
+  renderPickerGrid();
 };
 
-function renderPickerGrid(query) {
-  const q    = (query || '').toLowerCase();
+function renderPickerGrid() {
+  const q    = (document.getElementById('picker-search')?.value || '').toLowerCase();
+  const sort = document.getElementById('picker-sort')?.value || 'line';
   const grid = document.getElementById('picker-grid');
-  const list = q ? fishData.filter(f =>
-    f.line.toLowerCase().includes(q) ||
-    (f.genotype || '').toLowerCase().includes(q) ||
-    (f.location || '').toLowerCase().includes(q) ||
-    (f.tankId   || '').toLowerCase().includes(q) ||
-    (f.markers  || []).some(m => m.toLowerCase().includes(q))
-  ) : fishData;
+
+  let list = fishData.filter(f => {
+    if (pickerActiveStatus && f.status !== pickerActiveStatus) return false;
+    if (!q) return true;
+    return (
+      f.line.toLowerCase().includes(q) ||
+      (f.genotype || '').toLowerCase().includes(q) ||
+      (f.location || '').toLowerCase().includes(q) ||
+      (f.tankId   || '').toLowerCase().includes(q) ||
+      (f.markers  || []).some(m => m.toLowerCase().includes(q))
+    );
+  });
+
+  list = [...list].sort((a, b) => {
+    if (sort === 'age')     return (a.age     || '').localeCompare(b.age     || '');
+    if (sort === 'count')   return (a.count   || 0) - (b.count   || 0);
+    if (sort === 'updated') return (b.updated || '').localeCompare(a.updated || '');
+    return a.line.localeCompare(b.line);
+  });
   if (!list.length) { grid.innerHTML = '<p class="picker-empty">No tanks found.</p>'; return; }
   grid.innerHTML = list.map(f => {
     const checked = pickerSelected.has(f.tankId);

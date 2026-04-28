@@ -976,6 +976,10 @@ body.modal-open { overflow: hidden; }
   .filter-panel { display: none; }
 }
 
+/* Hide stats bar in experiment mode */
+.filter-panel.exp-mode .stats-bar,
+.filter-toggle-bar.exp-mode .mini-stats-bar { display: none; }
+
 /* ── Experiments button ───────────────────────────────────────────────────── */
 .exp-btn-wrap { position: relative; }
 
@@ -1112,6 +1116,16 @@ body.modal-open { overflow: hidden; }
 }
 .picker-header h2 { margin: 0; font-size: 1.1rem; }
 .picker-search-wrap { padding: .75rem 1.25rem; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.picker-filter-row {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin-top: .5rem;
+  flex-wrap: wrap;
+}
+.picker-status-chips { display: flex; flex-wrap: wrap; gap: .35rem; flex: 1; }
+.picker-status-chip { font-size: .75rem; padding: .25rem .6rem; }
+
 .picker-search-wrap input {
   width: 100%;
   box-sizing: border-box;

@@ -322,6 +322,15 @@
     </div>
     <div class="picker-search-wrap">
       <input id="picker-search" type="search" placeholder="Search tanks…" oninput="filterPicker()" />
+      <div class="picker-filter-row">
+        <div class="picker-status-chips" id="picker-status-chips"></div>
+        <select id="picker-sort" class="sort-select" onchange="filterPicker()">
+          <option value="line">Line</option>
+          <option value="age">Fert. Date</option>
+          <option value="count">Count</option>
+          <option value="updated">Last Updated</option>
+        </select>
+      </div>
     </div>
     <div id="picker-grid" class="picker-grid"></div>
     <div class="picker-footer">
